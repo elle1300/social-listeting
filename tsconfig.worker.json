@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "rootDir": "worker",
+    "outDir": "dist/worker",
+    "strict": true,
+    "noEmitOnError": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["worker/**/*.ts"]
+}

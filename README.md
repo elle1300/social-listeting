@@ -1,45 +1,68 @@
-# Social Listeting
+# Social Listening Agent
 
-Minimal GitHub-to-Railway smoke test with:
+v1.0 worker for mailbox.bot social listening. It keeps the live path deliberately small:
 
-- `npm run start` for the Next.js frontend
-- `npm run worker` for the Railway worker
+```text
+X recent search -> one OpenRouter score/draft call -> Supabase leads row -> Slack #social
+```
 
-## Local development
+No v2.0 routing, few-shot examples, Hermes, Slack buttons, or auto-posting live here yet.
+
+## Worker
 
 ```bash
 npm install
-npm run dev
-```
-
-In a second terminal:
-
-```bash
+npm run worker:check
 npm run worker
 ```
 
-The worker responds at:
+`npm run worker` compiles the TypeScript worker into `dist/worker` and starts the 15-minute loop. A tiny health server stays on `PORT` for Railway.
+
+Required worker env:
 
 ```text
-http://localhost:3001/health
+X_BEARER_TOKEN
+OPENROUTER_API_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SLACK_SOCIAL_WEBHOOK_URL
 ```
 
-## Railway setup
-
-1. Push this repo to GitHub.
-2. In Railway, create a new project from the `elle1300/social-listeting` GitHub repo.
-3. For the worker service:
-   - Build command: `npm install`
-   - Start command: `npm run worker`
-4. For the frontend service:
-   - Add another service from the same GitHub repo.
-   - Build command: `npm run build`
-   - Start command: `npm run start`
-5. After the worker deploys, copy its Railway public URL.
-6. Add this variable to the frontend service:
+Optional worker env:
 
 ```text
-NEXT_PUBLIC_WORKER_URL=https://your-worker-url.up.railway.app
+OPENROUTER_MODEL
+LEAD_RELEVANCE_THRESHOLD
+X_SEARCH_MAX_RESULTS
+PORT
 ```
 
-Redeploy the frontend after adding the variable.
+## Supabase
+
+v1.0 uses one table:
+
+```sql
+create table leads (
+  x_post_id    text primary key,
+  author       text,
+  text         text,
+  url          text,
+  query        text,
+  relevance    int,
+  intent       int,
+  category     text,
+  reply_draft  text,
+  reasoning    text,
+  status       text default 'pending',
+  notified_at  timestamptz,
+  created_at   timestamptz default now()
+);
+```
+
+## Frontend
+
+```bash
+npm run dev
+npm run build
+npm run start
+```
