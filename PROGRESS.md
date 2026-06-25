@@ -149,6 +149,15 @@ Not wired yet:
 - Production Filtered Stream singleton with advisory locking.
 - Usage ledger / spend guardrails.
 
+June 25 follow-up:
+
+- Worker default poll cadence is now one hour.
+- Added Supabase-backed `poll_cursors`.
+- Each query tag stores the latest X `newest_id`.
+- The worker passes that cursor as `since_id` on the next Recent Search call, so normal hourly polling only asks X for posts newer than the last successful stored batch.
+- `social_events` uniqueness remains as the idempotency backstop.
+- Pagination is intentionally skipped for now to protect the small X credit balance; if a query returns `next_token`, the worker logs a warning instead of buying another page.
+
 Security follow-up:
 
 - Rotate any X, Supabase, and OpenRouter secrets that were pasted into chat once the next deploy smoke test is complete.

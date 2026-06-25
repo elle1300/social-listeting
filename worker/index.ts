@@ -1,23 +1,48 @@
 import { createServer } from "node:http";
 import { scoreAndDraft } from "./brain";
-import { hasLead, insertLead, insertSocialEvent, markNotified } from "./db";
+import {
+  getPollCursor,
+  hasLead,
+  insertLead,
+  insertSocialEvent,
+  markNotified,
+  upsertPollCursor
+} from "./db";
+import type { SocialEvent } from "./events";
 import { socialEventToPost } from "./events";
 import { getQueries } from "./queries";
 import { postLead } from "./slack";
 import { recentSearch } from "./x";
 
 const PORT = Number(process.env.PORT ?? 3001);
-const POLL_MS = 15 * 60 * 1000;
+const POLL_MS = envNumber("SOCIAL_LISTENING_POLL_MS", 60 * 60 * 1000);
 const THRESHOLD = Number(process.env.LEAD_RELEVANCE_THRESHOLD ?? 70);
 const INGEST_ONLY = envFlag("SOCIAL_LISTENING_INGEST_ONLY");
 const RUN_ONCE = envFlag("SOCIAL_LISTENING_RUN_ONCE");
 
-const cursors = new Map<string, string>();
 let running = false;
 
 function envFlag(name: string): boolean {
   const value = process.env[name]?.toLowerCase();
   return value === "1" || value === "true" || value === "yes";
+}
+
+function envNumber(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function processEvent(event: SocialEvent, queryText: string): Promise<void> {
+  const post = socialEventToPost(event);
+  if (await hasLead(post.id)) return;
+
+  const lead = await scoreAndDraft(post, queryText);
+  await insertLead({ ...post, ...lead, query: queryText });
+
+  if (lead.relevance >= THRESHOLD) {
+    await postLead(post, lead, queryText);
+    await markNotified(post.id);
+  }
 }
 
 async function runCycle(): Promise<boolean> {
@@ -36,35 +61,43 @@ async function runCycle(): Promise<boolean> {
       if (!query.enabled) continue;
 
       try {
-        const result = await recentSearch(query.text, cursors.get(query.text), query.tag);
-        let hadPostFailure = false;
+        const sinceId = await getPollCursor(query.tag);
+        const result = await recentSearch(query.text, sinceId, query.tag);
+        const insertedEvents: SocialEvent[] = [];
+        let hadStorageFailure = false;
 
         for (const event of result.events) {
           try {
             const inserted = await insertSocialEvent(event);
             if (!inserted) continue;
             storedEvents += 1;
-            if (INGEST_ONLY) continue;
-
-            const post = socialEventToPost(event);
-            if (await hasLead(post.id)) continue;
-
-            const lead = await scoreAndDraft(post, query.text);
-            await insertLead({ ...post, ...lead, query: query.text });
-
-            if (lead.relevance >= THRESHOLD) {
-              await postLead(post, lead, query.text);
-              await markNotified(post.id);
-            }
+            insertedEvents.push(event);
           } catch (error) {
             cycleFailed = true;
-            hadPostFailure = true;
-            console.error(`Post ${event.postId} failed`, error);
+            hadStorageFailure = true;
+            console.error(`Post ${event.postId} storage failed`, error);
           }
         }
 
-        if (!hadPostFailure && result.newestId) {
-          cursors.set(query.text, result.newestId);
+        if (!hadStorageFailure) {
+          await upsertPollCursor(query, result.newestId, result.resultCount);
+        }
+
+        if (result.nextToken) {
+          console.warn(
+            `Query ${query.tag} returned more than one page; skipping pagination to protect X credits`
+          );
+        }
+
+        if (INGEST_ONLY) continue;
+
+        for (const event of insertedEvents) {
+          try {
+            await processEvent(event, query.text);
+          } catch (error) {
+            cycleFailed = true;
+            console.error(`Post ${event.postId} processing failed`, error);
+          }
         }
       } catch (error) {
         cycleFailed = true;

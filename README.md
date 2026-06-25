@@ -20,7 +20,7 @@ npm run worker:check
 npm run worker
 ```
 
-`npm run worker` compiles the TypeScript worker into `dist/worker` and starts the 15-minute loop. A tiny health server stays on `PORT` for Railway.
+`npm run worker` compiles the TypeScript worker into `dist/worker` and starts the one-hour loop. A tiny health server stays on `PORT` for Railway.
 
 Hello-world ingest, one query, no LLM or Slack:
 
@@ -31,6 +31,11 @@ npm run worker:once
 ```
 
 With only a small X API credit balance, keep probes narrow. X post reads are billed per returned post, and `$5` buys roughly 1,000 returned posts at `$0.005` each. By default, the worker now uses one low-volume probe query. The broader built-in query set only runs when `SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES=true` is set.
+
+Duplicate protection has two layers:
+
+- `poll_cursors` stores the latest X `newest_id` per query tag and passes it back to X as `since_id` on the next poll. This prevents the same returned posts from being billed again on normal hourly runs.
+- `social_events` still has a unique constraint on `(source, source_event_key)`, so duplicate rows are ignored if a retry, deploy, or cursor reset replays an already-seen post.
 
 Required worker env:
 
@@ -53,6 +58,7 @@ Optional worker env:
 OPENROUTER_MODEL
 LEAD_RELEVANCE_THRESHOLD
 X_SEARCH_MAX_RESULTS
+SOCIAL_LISTENING_POLL_MS
 SOCIAL_LISTENING_QUERY
 SOCIAL_LISTENING_QUERY_TAG
 SOCIAL_LISTENING_INGEST_ONLY
@@ -63,7 +69,7 @@ PORT
 
 ## Supabase
 
-Apply `supabase.sql` first. It creates `social_events` and the lightweight `agent_memory_social_events` view for future agent reads.
+Apply `supabase.sql` first. It creates `social_events`, `poll_cursors`, and the lightweight `agent_memory_social_events` view for future agent reads.
 
 The optional scoring path still uses `leads`:
 

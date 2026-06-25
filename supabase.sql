@@ -27,6 +27,22 @@ create index if not exists social_events_matched_rule_tags_idx
 
 alter table social_events enable row level security;
 
+create table if not exists poll_cursors (
+  query_tag text primary key,
+  query_text text not null,
+  newest_id text,
+  last_polled_at timestamptz,
+  last_success_at timestamptz,
+  last_result_count int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists poll_cursors_updated_at_idx
+  on poll_cursors (updated_at desc);
+
+alter table poll_cursors enable row level security;
+
 create or replace view agent_memory_social_events as
 select
   id,

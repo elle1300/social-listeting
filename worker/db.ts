@@ -1,8 +1,15 @@
 import type { Lead, Post } from "./brain";
 import type { SocialEvent } from "./events";
+import type { Query } from "./queries";
 
 interface StoredLead extends Post, Lead {
   query: string;
+}
+
+interface PollCursorRow {
+  query_tag: string;
+  query_text?: string;
+  newest_id?: string | null;
 }
 
 function supabaseConfig(): { url: string; key: string } {
@@ -69,6 +76,40 @@ export async function insertSocialEvent(event: SocialEvent): Promise<boolean> {
   });
   const rows: unknown = await res.json();
   return Array.isArray(rows) && rows.length > 0;
+}
+
+export async function getPollCursor(queryTag: string): Promise<string | undefined> {
+  const tag = encodeURIComponent(queryTag);
+  const res = await supabaseFetch(
+    `poll_cursors?query_tag=eq.${tag}&select=query_tag,query_text,newest_id&limit=1`
+  );
+  const rows: unknown = await res.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return undefined;
+  }
+
+  const [row] = rows as PollCursorRow[];
+  return row.newest_id ?? undefined;
+}
+
+export async function upsertPollCursor(
+  query: Query,
+  newestId: string | undefined,
+  resultCount: number
+): Promise<void> {
+  const now = new Date().toISOString();
+  await supabaseFetch("poll_cursors?on_conflict=query_tag", {
+    method: "POST",
+    headers: headers("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify({
+      query_tag: query.tag,
+      query_text: query.text,
+      ...(newestId ? { newest_id: newestId, last_success_at: now } : {}),
+      last_polled_at: now,
+      last_result_count: resultCount,
+      updated_at: now
+    })
+  });
 }
 
 export async function insertLead(lead: StoredLead): Promise<void> {

@@ -4,6 +4,8 @@ const X_SEARCH_URL = "https://api.x.com/2/tweets/search/recent";
 
 interface RecentSearchResult {
   newestId?: string;
+  nextToken?: string;
+  resultCount: number;
   events: SocialEvent[];
 }
 
@@ -27,6 +29,8 @@ interface XSearchResponse {
   };
   meta?: {
     newest_id?: string;
+    next_token?: string;
+    result_count?: number;
   };
 }
 
@@ -69,6 +73,8 @@ export async function recentSearch(
 
   return {
     newestId: data.meta?.newest_id,
+    nextToken: data.meta?.next_token,
+    resultCount: data.meta?.result_count ?? 0,
     events: (data.data ?? []).map((tweet) => {
       const authorId = tweet.author_id ?? "unknown";
       return {
