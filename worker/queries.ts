@@ -5,6 +5,13 @@ export interface Query {
   enabled: boolean;
 }
 
+export const LOW_VOLUME_PROBE_QUERY: Query = {
+  ring: 1,
+  tag: "hello:certified-mail-webhook:v1",
+  enabled: true,
+  text: '("certified mail API" OR "certified mail webhook" OR "return receipt webhook") -is:retweet lang:en'
+};
+
 export const QUERIES: Query[] = [
   {
     ring: 1,
@@ -56,6 +63,11 @@ export const QUERIES: Query[] = [
   }
 ];
 
+function envFlag(name: string): boolean {
+  const value = process.env[name]?.toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
 export function getQueries(): Query[] {
   const helloWorldQuery = process.env.SOCIAL_LISTENING_QUERY?.trim();
   if (helloWorldQuery) {
@@ -69,5 +81,9 @@ export function getQueries(): Query[] {
     ];
   }
 
-  return QUERIES;
+  if (envFlag("SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES")) {
+    return QUERIES;
+  }
+
+  return [LOW_VOLUME_PROBE_QUERY];
 }

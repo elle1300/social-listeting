@@ -68,6 +68,8 @@ Added hello-world mode:
 - `SOCIAL_LISTENING_QUERY_TAG` controls the stored rule tag.
 - `SOCIAL_LISTENING_INGEST_ONLY=true` stores events without OpenRouter or Slack.
 - `SOCIAL_LISTENING_RUN_ONCE=true` runs one cycle and exits.
+- By default, the worker uses one low-volume probe query to protect the small X API credit balance.
+- The broader built-in query set only runs with `SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES=true`.
 - Added `npm run worker:once`, which defaults to run-once ingest-only mode.
 
 Updated query metadata:
@@ -115,8 +117,8 @@ SLACK_SOCIAL_WEBHOOK_URL
 Apply `supabase.sql` to the Supabase project, then run:
 
 ```bash
-SOCIAL_LISTENING_QUERY='("certified mail" OR "return receipt") (api OR automate OR webhook) -is:retweet lang:en' \
-SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-api:v1' \
+SOCIAL_LISTENING_QUERY='("certified mail API" OR "certified mail webhook" OR "return receipt webhook") -is:retweet lang:en' \
+SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-webhook:v1' \
 npm run worker:once
 ```
 

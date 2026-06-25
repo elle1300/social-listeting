@@ -25,10 +25,12 @@ npm run worker
 Hello-world ingest, one query, no LLM or Slack:
 
 ```bash
-SOCIAL_LISTENING_QUERY='("certified mail" OR "return receipt") (api OR automate OR webhook) -is:retweet lang:en' \
-SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-api:v1' \
+SOCIAL_LISTENING_QUERY='("certified mail API" OR "certified mail webhook" OR "return receipt webhook") -is:retweet lang:en' \
+SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-webhook:v1' \
 npm run worker:once
 ```
+
+With only a small X API credit balance, keep probes narrow. X post reads are billed per returned post, and `$5` buys roughly 1,000 returned posts at `$0.005` each. By default, the worker now uses one low-volume probe query. The broader built-in query set only runs when `SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES=true` is set.
 
 Required worker env:
 
@@ -55,6 +57,7 @@ SOCIAL_LISTENING_QUERY
 SOCIAL_LISTENING_QUERY_TAG
 SOCIAL_LISTENING_INGEST_ONLY
 SOCIAL_LISTENING_RUN_ONCE
+SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES
 PORT
 ```
 
