@@ -1,4 +1,5 @@
 import type { Lead, Post } from "./brain";
+import type { SocialEvent } from "./events";
 
 interface StoredLead extends Post, Lead {
   query: string;
@@ -43,6 +44,29 @@ async function supabaseFetch(path: string, init: RequestInit = {}): Promise<Resp
 export async function hasLead(xPostId: string): Promise<boolean> {
   const id = encodeURIComponent(xPostId);
   const res = await supabaseFetch(`leads?x_post_id=eq.${id}&select=x_post_id&limit=1`);
+  const rows: unknown = await res.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+export async function insertSocialEvent(event: SocialEvent): Promise<boolean> {
+  const res = await supabaseFetch("social_events?on_conflict=source,source_event_key", {
+    method: "POST",
+    headers: headers("resolution=ignore-duplicates,return=representation"),
+    body: JSON.stringify({
+      source: event.source,
+      source_event_key: event.sourceEventKey,
+      post_id: event.postId,
+      author_id: event.authorId,
+      author_username: event.authorUsername,
+      text: event.text,
+      url: event.url,
+      conversation_id: event.conversationId,
+      matched_rule_tags: event.matchedRuleTags,
+      occurred_at: event.occurredAt,
+      received_at: event.receivedAt,
+      raw: event.raw
+    })
+  });
   const rows: unknown = await res.json();
   return Array.isArray(rows) && rows.length > 0;
 }

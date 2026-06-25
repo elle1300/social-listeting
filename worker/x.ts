@@ -1,16 +1,18 @@
-import type { Post } from "./brain";
+import type { SocialEvent } from "./events";
 
 const X_SEARCH_URL = "https://api.x.com/2/tweets/search/recent";
 
 interface RecentSearchResult {
   newestId?: string;
-  posts: Post[];
+  events: SocialEvent[];
 }
 
 interface XTweet {
   id: string;
   text: string;
   author_id?: string;
+  conversation_id?: string;
+  created_at?: string;
 }
 
 interface XUser {
@@ -28,7 +30,11 @@ interface XSearchResponse {
   };
 }
 
-export async function recentSearch(query: string, sinceId?: string): Promise<RecentSearchResult> {
+export async function recentSearch(
+  query: string,
+  sinceId?: string,
+  matchedRuleTag = "hello:recent-search:v1"
+): Promise<RecentSearchResult> {
   const token = process.env.X_BEARER_TOKEN;
   if (!token) {
     throw new Error("X_BEARER_TOKEN is required");
@@ -37,7 +43,7 @@ export async function recentSearch(query: string, sinceId?: string): Promise<Rec
   const params = new URLSearchParams({
     query,
     max_results: process.env.X_SEARCH_MAX_RESULTS ?? "10",
-    "tweet.fields": "author_id",
+    "tweet.fields": "author_id,conversation_id,created_at",
     expansions: "author_id",
     "user.fields": "username"
   });
@@ -59,13 +65,26 @@ export async function recentSearch(query: string, sinceId?: string): Promise<Rec
     (data.includes?.users ?? []).map((user) => [user.id, user.username ?? user.id])
   );
 
+  const receivedAt = new Date().toISOString();
+
   return {
     newestId: data.meta?.newest_id,
-    posts: (data.data ?? []).map((tweet) => ({
-      id: tweet.id,
-      text: tweet.text,
-      author: users.get(tweet.author_id ?? "") ?? tweet.author_id ?? "unknown",
-      url: `https://x.com/i/web/status/${tweet.id}`
-    }))
+    events: (data.data ?? []).map((tweet) => {
+      const authorId = tweet.author_id ?? "unknown";
+      return {
+        source: "x.recent_search",
+        sourceEventKey: tweet.id,
+        postId: tweet.id,
+        authorId,
+        authorUsername: users.get(authorId) ?? authorId,
+        text: tweet.text,
+        url: `https://x.com/i/web/status/${tweet.id}`,
+        conversationId: tweet.conversation_id ?? tweet.id,
+        matchedRuleTags: [matchedRuleTag],
+        occurredAt: tweet.created_at ?? receivedAt,
+        receivedAt,
+        raw: tweet
+      };
+    })
   };
 }

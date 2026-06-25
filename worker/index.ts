@@ -1,36 +1,52 @@
 import { createServer } from "node:http";
 import { scoreAndDraft } from "./brain";
-import { hasLead, insertLead, markNotified } from "./db";
-import { QUERIES } from "./queries";
+import { hasLead, insertLead, insertSocialEvent, markNotified } from "./db";
+import { socialEventToPost } from "./events";
+import { getQueries } from "./queries";
 import { postLead } from "./slack";
 import { recentSearch } from "./x";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const POLL_MS = 15 * 60 * 1000;
 const THRESHOLD = Number(process.env.LEAD_RELEVANCE_THRESHOLD ?? 70);
+const INGEST_ONLY = envFlag("SOCIAL_LISTENING_INGEST_ONLY");
+const RUN_ONCE = envFlag("SOCIAL_LISTENING_RUN_ONCE");
 
 const cursors = new Map<string, string>();
 let running = false;
 
-async function runCycle(): Promise<void> {
+function envFlag(name: string): boolean {
+  const value = process.env[name]?.toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+async function runCycle(): Promise<boolean> {
   if (running) {
     console.log("Previous worker cycle still running; skipping this tick");
-    return;
+    return false;
   }
 
   running = true;
+  let cycleFailed = false;
+  let storedEvents = 0;
   console.log(`Worker cycle started at ${new Date().toISOString()}`);
 
   try {
-    for (const query of QUERIES) {
+    for (const query of getQueries()) {
       if (!query.enabled) continue;
 
       try {
-        const result = await recentSearch(query.text, cursors.get(query.text));
+        const result = await recentSearch(query.text, cursors.get(query.text), query.tag);
         let hadPostFailure = false;
 
-        for (const post of result.posts) {
+        for (const event of result.events) {
           try {
+            const inserted = await insertSocialEvent(event);
+            if (!inserted) continue;
+            storedEvents += 1;
+            if (INGEST_ONLY) continue;
+
+            const post = socialEventToPost(event);
             if (await hasLead(post.id)) continue;
 
             const lead = await scoreAndDraft(post, query.text);
@@ -41,8 +57,9 @@ async function runCycle(): Promise<void> {
               await markNotified(post.id);
             }
           } catch (error) {
+            cycleFailed = true;
             hadPostFailure = true;
-            console.error(`Post ${post.id} failed`, error);
+            console.error(`Post ${event.postId} failed`, error);
           }
         }
 
@@ -50,13 +67,18 @@ async function runCycle(): Promise<void> {
           cursors.set(query.text, result.newestId);
         }
       } catch (error) {
+        cycleFailed = true;
         console.error(`Query failed: ${query.text}`, error);
       }
     }
   } finally {
     running = false;
-    console.log(`Worker cycle finished at ${new Date().toISOString()}`);
+    console.log(
+      `Worker cycle finished at ${new Date().toISOString()} with ${storedEvents} new event(s)`
+    );
   }
+
+  return !cycleFailed;
 }
 
 function startHealthServer(): void {
@@ -78,6 +100,12 @@ function startHealthServer(): void {
   });
 }
 
-startHealthServer();
-void runCycle();
-setInterval(() => void runCycle(), POLL_MS);
+if (!RUN_ONCE) {
+  startHealthServer();
+  void runCycle();
+  setInterval(() => void runCycle(), POLL_MS);
+} else {
+  void runCycle().then((ok) => {
+    if (!ok) process.exitCode = 1;
+  });
+}

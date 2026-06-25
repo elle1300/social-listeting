@@ -1,4 +1,5 @@
 declare const process: {
+  exitCode?: number;
   env: Record<string, string | undefined>;
 };
 

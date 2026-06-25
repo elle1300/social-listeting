@@ -11,6 +11,7 @@
     "start": "next start",
     "worker:build": "tsc -p tsconfig.worker.json",
     "worker:check": "npm run worker:build && node dist/worker/brain.js",
+    "worker:once": "npm run worker:build && SOCIAL_LISTENING_RUN_ONCE=true SOCIAL_LISTENING_INGEST_ONLY=true node dist/worker/index.js",
     "worker": "npm run worker:build && node dist/worker/index.js"
   },
   "dependencies": {
