@@ -83,50 +83,93 @@ Updated docs:
 - Added the hello-world command.
 - Split required env vars into ingest-only vs scoring/Slack requirements.
 
+## Latest Update
+
+Validated the Phase 0 path end to end:
+
+- Applied `supabase.sql` in Supabase.
+- Added local `.env.local` values for X, Supabase, and OpenRouter.
+- Ran the first narrow X -> Supabase probe successfully.
+- Ran a broader `certified mail` probe to prove real inserts; 10 rows landed in `social_events`.
+- Confirmed Supabase read-back through REST.
+
+Built the lightweight Next.js one-pager:
+
+- Replaced the smoke-test frontend with a small operator page.
+- The page reads `social_events` from Supabase server-side.
+- Shows total event count, current-query match count, readiness for Supabase/OpenRouter/Slack, current query/tag, and recent matching events.
+- Filters the main event feed to the current `SOCIAL_LISTENING_QUERY_TAG` so older probe rows do not look like current ingest.
+- Pushed live on `main` in commit `93134da`.
+
+Current default probe:
+
+```text
+((postal mail mcp) OR ("ai agent" "physical address")) -is:retweet lang:en
+```
+
+Current default tag:
+
+```text
+hello:postal-mcp-ai-address:v1
+```
+
+Note: `.env.local` is local-only and gitignored. Production env vars, if set, override the committed defaults.
+
 ## Verification
 
 Ran successfully:
 
 ```bash
-npm run worker:check
 npm run build
+npm run worker:build
 git diff --check
 ```
 
-## Current Live-Run Blockers
+Earlier verification also passed:
 
-The shell does not currently have these required secrets:
+```bash
+npm run worker:check
+```
+
+## Current Status
+
+Working:
+
+- X Recent Search credentials are valid.
+- Supabase REST insert/read path is valid.
+- `social_events` schema is in place.
+- OpenRouter key is present locally.
+- Next.js one-pager builds and runs locally.
+- Latest pushed commit is on `origin/main`.
+
+Not wired yet:
+
+- Slack webhook/action path.
+- Full score/draft/Slack review run.
+- Production Filtered Stream singleton with advisory locking.
+- Usage ledger / spend guardrails.
+
+Security follow-up:
+
+- Rotate any X, Supabase, and OpenRouter secrets that were pasted into chat once the next deploy smoke test is complete.
+
+## Next Step
+
+On production, make sure env vars are present and not stale:
 
 ```text
 X_BEARER_TOKEN
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+OPENROUTER_API_KEY
 ```
 
-Because of that, the X -> Supabase hello-world probe has not been executed yet.
-
-Optional for the scoring/Slack path:
+Optional production overrides:
 
 ```text
-OPENROUTER_API_KEY
+SOCIAL_LISTENING_QUERY
+SOCIAL_LISTENING_QUERY_TAG
 SLACK_SOCIAL_WEBHOOK_URL
 ```
 
-## Next Step
-
-Apply `supabase.sql` to the Supabase project, then run:
-
-```bash
-SOCIAL_LISTENING_QUERY='("certified mail API" OR "certified mail webhook" OR "return receipt webhook") -is:retweet lang:en' \
-SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-webhook:v1' \
-npm run worker:once
-```
-
-Expected result:
-
-- The worker calls X Recent Search for one careful keyword combo.
-- New posts are inserted into `social_events`.
-- Duplicate posts are skipped.
-- No OpenRouter or Slack calls happen in this hello-world run.
-
-After that works, the next architecture-aligned improvement is a real X Filtered Stream singleton with advisory locking and Recent Search as gap recovery.
+Then either test the scoring path with OpenRouter enabled or add the Slack webhook and run the full human-review path. After that, the next architecture-aligned improvement is a real X Filtered Stream singleton with advisory locking and Recent Search as gap recovery.
