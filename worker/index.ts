@@ -11,7 +11,7 @@ import {
 import type { SocialEvent } from "./events";
 import { socialEventToPost } from "./events";
 import { getQueries } from "./queries";
-import { postLead } from "./slack";
+import { postEventDigest, postLead } from "./slack";
 import { recentSearch } from "./x";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -19,6 +19,8 @@ const POLL_MS = envNumber("SOCIAL_LISTENING_POLL_MS", 60 * 60 * 1000);
 const THRESHOLD = Number(process.env.LEAD_RELEVANCE_THRESHOLD ?? 70);
 const INGEST_ONLY = envFlag("SOCIAL_LISTENING_INGEST_ONLY");
 const RUN_ONCE = envFlag("SOCIAL_LISTENING_RUN_ONCE");
+const SLACK_DIGEST = envFlag("SOCIAL_LISTENING_SLACK_DIGEST");
+const SLACK_DIGEST_ON_ZERO = envFlag("SOCIAL_LISTENING_SLACK_DIGEST_ON_ZERO");
 
 let running = false;
 
@@ -87,6 +89,15 @@ async function runCycle(): Promise<boolean> {
           console.warn(
             `Query ${query.tag} returned more than one page; skipping pagination to protect X credits`
           );
+        }
+
+        if (SLACK_DIGEST && (insertedEvents.length > 0 || SLACK_DIGEST_ON_ZERO)) {
+          try {
+            await postEventDigest(insertedEvents, query.tag, query.text, result.resultCount);
+          } catch (error) {
+            cycleFailed = true;
+            console.error(`Slack digest failed for ${query.tag}`, error);
+          }
         }
 
         if (INGEST_ONLY) continue;

@@ -157,6 +157,7 @@ June 25 follow-up:
 - The worker passes that cursor as `since_id` on the next Recent Search call, so normal hourly polling only asks X for posts newer than the last successful stored batch.
 - `social_events` uniqueness remains as the idempotency backstop.
 - Pagination is intentionally skipped for now to protect the small X credit balance; if a query returns `next_token`, the worker logs a warning instead of buying another page.
+- Added optional hourly Slack digests from newly stored `social_events` using `SLACK_SOCIAL_WEBHOOK_URL` and `SOCIAL_LISTENING_SLACK_DIGEST=true`.
 
 Security follow-up:
 
