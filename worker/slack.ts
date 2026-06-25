@@ -1,6 +1,11 @@
 import type { Lead, Post } from "./brain";
 import type { SocialEvent } from "./events";
 
+interface SlackApiResponse {
+  ok?: boolean;
+  error?: string;
+}
+
 function formatLead(post: Post, lead: Lead, matchedQuery: string): string {
   return [
     `New X lead: @${post.author}`,
@@ -15,21 +20,50 @@ function formatLead(post: Post, lead: Lead, matchedQuery: string): string {
   ].join("\n");
 }
 
-export async function postLead(post: Post, lead: Lead, matchedQuery: string): Promise<void> {
+async function postSlackText(text: string): Promise<void> {
   const url = process.env.SLACK_SOCIAL_WEBHOOK_URL;
-  if (!url) {
-    throw new Error("SLACK_SOCIAL_WEBHOOK_URL is required");
+  if (url) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+
+    if (!res.ok) {
+      throw new Error(`Slack webhook ${res.status}: ${await res.text()}`);
+    }
+    return;
   }
 
-  const res = await fetch(url, {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_SOCIAL_CHANNEL_ID;
+  if (!token || !channel) {
+    throw new Error(
+      "Set SLACK_SOCIAL_WEBHOOK_URL or both SLACK_BOT_TOKEN and SLACK_SOCIAL_CHANNEL_ID"
+    );
+  }
+
+  const res = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: formatLead(post, lead, matchedQuery) })
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ channel, text })
   });
 
   if (!res.ok) {
-    throw new Error(`Slack ${res.status}: ${await res.text()}`);
+    throw new Error(`Slack API ${res.status}: ${await res.text()}`);
   }
+
+  const data = (await res.json()) as SlackApiResponse;
+  if (!data.ok) {
+    throw new Error(`Slack API error: ${data.error ?? "unknown_error"}`);
+  }
+}
+
+export async function postLead(post: Post, lead: Lead, matchedQuery: string): Promise<void> {
+  await postSlackText(formatLead(post, lead, matchedQuery));
 }
 
 function slackEscape(value: string): string {
@@ -78,23 +112,8 @@ export async function postEventDigest(
   queryText: string,
   resultCount: number
 ): Promise<void> {
-  const url = process.env.SLACK_SOCIAL_WEBHOOK_URL;
-  if (!url) {
-    throw new Error("SLACK_SOCIAL_WEBHOOK_URL is required");
-  }
-
   const limit = Number(process.env.SOCIAL_LISTENING_SLACK_DIGEST_LIMIT ?? 8);
   const visibleEvents = events.slice(0, Number.isFinite(limit) && limit > 0 ? limit : 8);
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: formatDigest(visibleEvents, queryTag, queryText, resultCount)
-    })
-  });
-
-  if (!res.ok) {
-    throw new Error(`Slack ${res.status}: ${await res.text()}`);
-  }
+  await postSlackText(formatDigest(visibleEvents, queryTag, queryText, resultCount));
 }
