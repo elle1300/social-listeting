@@ -20,7 +20,7 @@ function formatLead(post: Post, lead: Lead, matchedQuery: string): string {
   ].join("\n");
 }
 
-async function postSlackText(text: string): Promise<void> {
+export async function postSlackText(text: string): Promise<void> {
   const url = process.env.SLACK_SOCIAL_WEBHOOK_URL;
   if (url) {
     const res = await fetch(url, {

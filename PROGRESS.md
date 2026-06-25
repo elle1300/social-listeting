@@ -158,6 +158,7 @@ June 25 follow-up:
 - `social_events` uniqueness remains as the idempotency backstop.
 - Pagination is intentionally skipped for now to protect the small X credit balance; if a query returns `next_token`, the worker logs a warning instead of buying another page.
 - Added optional hourly Slack digests from newly stored `social_events` using either `SLACK_SOCIAL_WEBHOOK_URL` or `SLACK_BOT_TOKEN` + `SLACK_SOCIAL_CHANNEL_ID`.
+- Added `npm run worker:slack-smoke` to test Slack delivery without calling X or Supabase.
 
 Security follow-up:
 

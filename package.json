@@ -12,6 +12,7 @@
     "worker:build": "tsc -p tsconfig.worker.json",
     "worker:check": "npm run worker:build && node dist/worker/brain.js",
     "worker:once": "npm run worker:build && SOCIAL_LISTENING_RUN_ONCE=true SOCIAL_LISTENING_INGEST_ONLY=true X_SEARCH_MAX_RESULTS=10 node dist/worker/index.js",
+    "worker:slack-smoke": "npm run worker:build && node dist/worker/slack-smoke.js",
     "worker": "npm run worker:build && node dist/worker/index.js"
   },
   "dependencies": {

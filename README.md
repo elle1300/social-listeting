@@ -30,6 +30,12 @@ SOCIAL_LISTENING_QUERY_TAG='hello:certified-mail-webhook:v1' \
 npm run worker:once
 ```
 
+Slack-only smoke test, no X or Supabase calls:
+
+```bash
+npm run worker:slack-smoke
+```
+
 With only a small X API credit balance, keep probes narrow. X post reads are billed per returned post, and `$5` buys roughly 1,000 returned posts at `$0.005` each. By default, the worker now uses one low-volume probe query. The broader built-in query set only runs when `SOCIAL_LISTENING_ENABLE_DEFAULT_QUERIES=true` is set.
 
 Duplicate protection has two layers:
