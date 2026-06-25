@@ -1,8 +1,8 @@
 import "./styles.css";
 
 export const metadata = {
-  title: "Social Listeting",
-  description: "A tiny frontend connected to a Railway worker."
+  title: "Mailbox.bot Social Listening",
+  description: "A lightweight social listening control page."
 };
 
 export default function RootLayout({ children }) {

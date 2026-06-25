@@ -7,9 +7,9 @@ export interface Query {
 
 export const LOW_VOLUME_PROBE_QUERY: Query = {
   ring: 1,
-  tag: "hello:certified-mail-webhook:v1",
+  tag: "hello:postal-mcp-ai-address:v1",
   enabled: true,
-  text: '("certified mail API" OR "certified mail webhook" OR "return receipt webhook") -is:retweet lang:en'
+  text: '((postal mail mcp) OR ("ai agent" "physical address")) -is:retweet lang:en'
 };
 
 export const QUERIES: Query[] = [
